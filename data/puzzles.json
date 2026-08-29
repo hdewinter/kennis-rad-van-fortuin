@@ -1,19 +1,22 @@
 {
   "_schema": {
-    "category": "gezegde | filmtitel | liedtitel | zin | vraag",
+    "category": "vrij te kiezen label, bv. woord | gezegde | filmtitel | liedtitel | zin | vraag | eigen",
     "age": "kind | jongvolwassen | volwassen_makkelijk | volwassen_moeilijk",
-    "prompt": "optioneel, alleen bij category 'vraag' — de vraag die boven het bord getoond wordt",
-    "text": "de zin/het antwoord dat geraden moet worden (wordt automatisch als hoofdletters getoond)"
+    "prompt": "optioneel — een vraag/hint die boven het bord getoond wordt",
+    "text": "de zin/het antwoord dat geraden moet worden (wordt automatisch als hoofdletters getoond)",
+    "let_op_kind": "bij age=kind alleen simpele losse woordjes gebruiken, geen lange zinnen"
   },
   "puzzles": [
-    { "id": "p1", "category": "gezegde", "age": "kind", "text": "BETER LAAT DAN NOOIT" },
-    { "id": "p2", "category": "gezegde", "age": "kind", "text": "DE VROEGE VOGEL VANGT DE WORM" },
-    { "id": "p3", "category": "gezegde", "age": "kind", "text": "AL DOENDE LEERT MEN" },
-    { "id": "p4", "category": "filmtitel", "age": "kind", "text": "DE LEEUWENKONING" },
-    { "id": "p5", "category": "filmtitel", "age": "kind", "text": "TOY STORY" },
-    { "id": "p6", "category": "filmtitel", "age": "kind", "text": "FROZEN" },
-    { "id": "p7", "category": "liedtitel", "age": "kind", "text": "IN DE MANESCHIJN" },
-    { "id": "p8", "category": "zin", "age": "kind", "text": "OEFENING BAART KUNST" },
+    { "id": "p1", "category": "woord", "age": "kind", "text": "HOND" },
+    { "id": "p2", "category": "woord", "age": "kind", "text": "KAT" },
+    { "id": "p3", "category": "woord", "age": "kind", "text": "BAL" },
+    { "id": "p4", "category": "woord", "age": "kind", "text": "ZON" },
+    { "id": "p5", "category": "woord", "age": "kind", "text": "BOOM" },
+    { "id": "p6", "category": "woord", "age": "kind", "text": "FIETS" },
+    { "id": "p7", "category": "woord", "age": "kind", "text": "APPEL" },
+    { "id": "p8", "category": "woord", "age": "kind", "text": "MELK" },
+    { "id": "p37", "category": "filmtitel", "age": "kind", "text": "FROZEN" },
+    { "id": "p38", "category": "filmtitel", "age": "kind", "text": "SHREK" },
     { "id": "p33", "category": "vraag", "age": "kind", "prompt": "Hoe heet de baby van een hond?", "text": "PUPPY" },
 
     { "id": "p9", "category": "gezegde", "age": "jongvolwassen", "text": "APPELS MET PEREN VERGELIJKEN" },

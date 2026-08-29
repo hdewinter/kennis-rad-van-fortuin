@@ -10,9 +10,13 @@ mag je opnieuw draaien. Je mag op elk moment i.p.v. draaien de hele zin
 proberen op te lossen voor de ronde-winst.
 
 ## Rad-segmenten
-16 vakken: puntenwaardes (200–1000) + 3 specials:
-- **Bankroet** — speler verliest de punten die ze in déze puzzel al hadden
-  verdiend (niet de totaalscore van vorige puzzels), beurt gaat door.
+16 vakken: puntenwaardes (200–1000) + 3 specials (geen Bankroet — bewust
+verwijderd, te frustrerend voor een familiespel):
+- **Verdubbelaar (x2)** — speler wint een verdubbelaar-token (stapelbaar).
+  Mag op elk gewenst moment ingezet worden vóór het kiezen van een letter
+  (bv. bij een letter die je vaak verwacht, zoals de E) — punten van die
+  letter tellen dan dubbel. Wordt alleen verbruikt bij een score (mis =
+  token blijft behouden). Dezelfde speler mag na het winnen opnieuw draaien.
 - **Beurt kwijt** — beurt gaat direct door, geen letter kiezen.
 - **Gratis letter** — een willekeurige nog-verborgen letter wordt gratis
   onthuld, dezelfde speler mag opnieuw draaien.
@@ -36,11 +40,23 @@ Bij spelstart kies je welke niveaus meedoen (chips aan/uit). De categorie
 
 ## Scoring
 - Score per speler is cumulatief over alle puzzels in het spel.
-- `puzzleScore` (interne teller) houdt bij wat een speler in de huidige
-  puzzel heeft verdiend — nodig om bij Bankroet alleen dát bedrag terug te
-  nemen, niet de hele totaalscore.
 - Puzzel oplossen (zelf typen of laatste letter onthult alles) geeft een
   vaste bonus van 500 punten aan de speler die aan zet was.
+- Kinderniveau (`age: "kind"`) bestaat uit simpele losse woordjes, geen
+  lange zinnen — expliciete eis, zie `data/puzzles.json`.
+
+## Instellingen (tandwiel-knop, altijd zichtbaar)
+- **Spelbeheer**: "Ander woord" (huidige puzzel overslaan zonder score-impact)
+  en "Spel opnieuw starten" (terug naar startscherm).
+- **Niveaus**: aan/uit per leeftijdscategorie.
+- **Puzzel toevoegen**: los, als kwismaster — vrije categorie-tekst (Film,
+  Muziek, Sport, ...), leeftijdsniveau, optionele hint/vraag, en het
+  antwoord. Wordt bewaard via de persistente artifact-storage (blijft ook
+  bij een volgende sessie beschikbaar).
+- **Bulk (CSV)**: plak meerdere regels `categorie,leeftijd,tekst,vraag`
+  tegelijk in; wordt geparsed en toegevoegd aan dezelfde opslag als "los
+  toevoegen".
+- **Handleiding**: korte spelregels in het Nederlands, direct in de app.
 
 ## Status
 - [x] Opzet gedeeld en afgestemd in gesprek

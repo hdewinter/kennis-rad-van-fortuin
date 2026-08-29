@@ -1,23 +1,26 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Trophy, RotateCcw, Sparkles, Check, X, Shuffle } from "lucide-react";
+import { Trophy, RotateCcw, Sparkles, Check, X, Shuffle, Settings, Plus, SkipForward } from "lucide-react";
 
 // ============================================================
-// PUZZEL-DATABASE — vul dit gerust aan met eigen zinnen.
-// category: "gezegde" | "filmtitel" | "liedtitel" | "zin" | "vraag"
+// PUZZEL-DATABASE — vul dit gerust aan met eigen zinnen, of gebruik
+// het instellingenmenu (tandwiel) in het spel om zelf toe te voegen.
+// category: vrij te kiezen label (bv. "woord", "filmtitel", "vraag", "eigen"...)
 // age:      "kind" | "jongvolwassen" | "volwassen_makkelijk" | "volwassen_moeilijk"
-// prompt:   optioneel — alleen gebruikt bij category "vraag" (de vraag zelf)
+// prompt:   optioneel — een vraag/hint die boven het bord getoond wordt
 // text:     de zin/het antwoord dat geraden moet worden (hoofdletters)
 // ============================================================
 const PUZZLES = [
-  // --- kind ---
-  { id: "p1", category: "gezegde", age: "kind", text: "BETER LAAT DAN NOOIT" },
-  { id: "p2", category: "gezegde", age: "kind", text: "DE VROEGE VOGEL VANGT DE WORM" },
-  { id: "p3", category: "gezegde", age: "kind", text: "AL DOENDE LEERT MEN" },
-  { id: "p4", category: "filmtitel", age: "kind", text: "DE LEEUWENKONING" },
-  { id: "p5", category: "filmtitel", age: "kind", text: "TOY STORY" },
-  { id: "p6", category: "filmtitel", age: "kind", text: "FROZEN" },
-  { id: "p7", category: "liedtitel", age: "kind", text: "IN DE MANESCHIJN" },
-  { id: "p8", category: "zin", age: "kind", text: "OEFENING BAART KUNST" },
+  // --- kind: alleen simpele losse woordjes ---
+  { id: "p1", category: "woord", age: "kind", text: "HOND" },
+  { id: "p2", category: "woord", age: "kind", text: "KAT" },
+  { id: "p3", category: "woord", age: "kind", text: "BAL" },
+  { id: "p4", category: "woord", age: "kind", text: "ZON" },
+  { id: "p5", category: "woord", age: "kind", text: "BOOM" },
+  { id: "p6", category: "woord", age: "kind", text: "FIETS" },
+  { id: "p7", category: "woord", age: "kind", text: "APPEL" },
+  { id: "p8", category: "woord", age: "kind", text: "MELK" },
+  { id: "p37", category: "filmtitel", age: "kind", text: "FROZEN" },
+  { id: "p38", category: "filmtitel", age: "kind", text: "SHREK" },
   { id: "p33", category: "vraag", age: "kind", prompt: "Hoe heet de baby van een hond?", text: "PUPPY" },
 
   // --- jongvolwassen ---
@@ -66,7 +69,12 @@ const CATEGORY_LABEL = {
   liedtitel: "Liedtitel",
   zin: "Bekende zin",
   vraag: "Kennisvraag",
+  woord: "Woord",
+  eigen: "Eigen puzzel",
 };
+function categoryLabel(cat) {
+  return CATEGORY_LABEL[cat] || (cat ? cat.charAt(0).toUpperCase() + cat.slice(1) : "Puzzel");
+}
 
 // ============================================================
 // RAD-SEGMENTEN
@@ -75,7 +83,7 @@ const WHEEL_SEGMENTS = [
   { type: "points", value: 300 },
   { type: "points", value: 500 },
   { type: "points", value: 200 },
-  { type: "special", value: "BANKROET" },
+  { type: "special", value: "VERDUBBELAAR" },
   { type: "points", value: 400 },
   { type: "points", value: 600 },
   { type: "points", value: 250 },
@@ -90,8 +98,8 @@ const WHEEL_SEGMENTS = [
   { type: "points", value: 550 },
 ];
 const POINT_COLORS = ["#F2B705", "#E85D75", "#22D3C7", "#9B7BF2"];
-const SPECIAL_COLOR = { BANKROET: "#14171F", BEURT_KWIJT: "#5A6088", GRATIS_LETTER: "#2ECC71" };
-const SPECIAL_LABEL = { BANKROET: "BANKROET", BEURT_KWIJT: "BEURT KWIJT", GRATIS_LETTER: "GRATIS LETTER" };
+const SPECIAL_COLOR = { VERDUBBELAAR: "#E67E22", BEURT_KWIJT: "#5A6088", GRATIS_LETTER: "#2ECC71" };
+const SPECIAL_LABEL = { VERDUBBELAAR: "x2", BEURT_KWIJT: "BEURT KWIJT", GRATIS_LETTER: "GRATIS LETTER" };
 
 function segColor(seg, i) {
   if (seg.type === "special") return SPECIAL_COLOR[seg.value];
@@ -228,6 +236,20 @@ function slicesPath(cx, cy, r, startAngle, endAngle) {
   const large = endAngle - startAngle <= 180 ? 0 : 1;
   return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y} Z`;
 }
+// Simpele CSV-regelparser (ondersteunt "aanhalingstekens" rond velden met komma's)
+function parseCsvLine(line) {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQuotes = !inQuotes; continue; }
+    if (c === "," && !inQuotes) { out.push(cur.trim()); cur = ""; continue; }
+    cur += c;
+  }
+  out.push(cur.trim());
+  return out;
+}
 
 // ============================================================
 // APP
@@ -256,6 +278,38 @@ export default function RadVanFortuin() {
   const [solveInput, setSolveInput] = useState("");
   const [roundWinnerIdx, setRoundWinnerIdx] = useState(null);
   const [freeLetterFlash, setFreeLetterFlash] = useState(null);
+  const [doublerActive, setDoublerActive] = useState(false);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("beheer"); // beheer | toevoegen | bulk | help
+  const [customPuzzles, setCustomPuzzles] = useState([]);
+  const [customCategory, setCustomCategory] = useState("");
+  const [customAge, setCustomAge] = useState("volwassen_makkelijk");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customText, setCustomText] = useState("");
+  const [csvText, setCsvText] = useState("");
+  const [csvFeedback, setCsvFeedback] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("custom-puzzles", false);
+        if (res && res.value) setCustomPuzzles(JSON.parse(res.value));
+      } catch (e) {
+        /* nog geen eigen puzzels opgeslagen — prima */
+      }
+    })();
+  }, []);
+
+  const persistCustomPuzzles = async (list) => {
+    try {
+      await window.storage.set("custom-puzzles", JSON.stringify(list), false);
+    } catch (e) {
+      /* opslaan mislukt — speel gewoon door, alleen niet blijvend bewaard */
+    }
+  };
+
+  const ALL_PUZZLES = useMemo(() => [...PUZZLES, ...customPuzzles], [customPuzzles]);
 
   const spinResultRef = useRef(null);
 
@@ -274,9 +328,9 @@ export default function RadVanFortuin() {
 
   const buildQueue = useCallback(() => {
     const active = Object.entries(ageFilter).filter(([, v]) => v).map(([k]) => k);
-    const pool = active.length ? PUZZLES.filter((p) => active.includes(p.age)) : PUZZLES;
-    return shuffle(pool.length ? pool : PUZZLES);
-  }, [ageFilter]);
+    const pool = active.length ? ALL_PUZZLES.filter((p) => active.includes(p.age)) : ALL_PUZZLES;
+    return shuffle(pool.length ? pool : ALL_PUZZLES);
+  }, [ageFilter, ALL_PUZZLES]);
 
   const loadPuzzle = useCallback((q) => {
     let list = q;
@@ -296,6 +350,7 @@ export default function RadVanFortuin() {
       color: PLAYER_COLORS[i],
       total: 0,
       puzzleScore: 0,
+      doublers: 0,
     }));
     setPlayers(ps);
     setCurrentIdx(0);
@@ -340,15 +395,15 @@ export default function RadVanFortuin() {
 
   const handleSpinResult = (seg) => {
     if (seg.type === "points") {
+      setDoublerActive(false);
       setPendingValue(seg.value);
       setScreen("guessing");
       return;
     }
-    if (seg.value === "BANKROET") {
-      playWrongBuzz();
-      setPlayers((ps) => ps.map((p, i) => (i === currentIdx ? { ...p, total: p.total - p.puzzleScore, puzzleScore: 0 } : p)));
-      setMessage(`Bankroet! ${players[currentIdx]?.name} verliest de punten van deze puzzel.`);
-      advanceTurn();
+    if (seg.value === "VERDUBBELAAR") {
+      playLandChime();
+      setPlayers((ps) => ps.map((p, i) => (i === currentIdx ? { ...p, doublers: p.doublers + 1 } : p)));
+      setMessage(`${players[currentIdx]?.name} wint een verdubbelaar (x2)! Spin opnieuw, en zet 'm in bij een letter die je vaak verwacht.`);
       return;
     }
     if (seg.value === "BEURT_KWIJT") {
@@ -383,12 +438,21 @@ export default function RadVanFortuin() {
     const count = puzzle.text.toUpperCase().split("").filter((ch) => ch === letter).length;
     if (count > 0) {
       playCorrectBlip();
-      const points = pendingValue * count;
-      setPlayers((ps) => ps.map((p, i) => (i === currentIdx ? { ...p, total: p.total + points, puzzleScore: p.puzzleScore + points } : p)));
+      const usedDoubler = doublerActive;
+      const multiplier = usedDoubler ? 2 : 1;
+      const points = pendingValue * count * multiplier;
+      setPlayers((ps) =>
+        ps.map((p, i) =>
+          i === currentIdx
+            ? { ...p, total: p.total + points, puzzleScore: p.puzzleScore + points, doublers: usedDoubler ? p.doublers - 1 : p.doublers }
+            : p
+        )
+      );
+      setDoublerActive(false);
       const nextRevealed = new Set(revealed);
       nextRevealed.add(letter);
       setRevealed(nextRevealed);
-      setMessage(`Juist! "${letter}" komt ${count}x voor — +${points} punten.`);
+      setMessage(`Juist! "${letter}" komt ${count}x voor — +${points} punten${usedDoubler ? " (verdubbeld!)" : ""}.`);
       const stillHidden = [...puzzleAlphaSet].some((ch) => !nextRevealed.has(ch));
       if (!stillHidden) {
         finishRound(currentIdx, SOLVE_BONUS);
@@ -397,6 +461,7 @@ export default function RadVanFortuin() {
       }
     } else {
       playWrongBuzz();
+      setDoublerActive(false);
       setMessage(`"${letter}" komt niet voor. Beurt gaat naar de volgende speler.`);
       advanceTurn();
       setScreen("wheel");
@@ -434,8 +499,71 @@ export default function RadVanFortuin() {
 
   const nextPuzzle = () => {
     setMessage("");
+    setDoublerActive(false);
     loadPuzzle(queue);
     setScreen("wheel");
+  };
+
+  const skipPuzzle = () => {
+    setMessage("");
+    setDoublerActive(false);
+    loadPuzzle(queue);
+    setScreen("wheel");
+    setShowSettings(false);
+  };
+
+  const restartGame = () => {
+    setScreen("start");
+    setShowSettings(false);
+    setPlayers([]);
+    setPuzzle(null);
+    setMessage("");
+    setDoublerActive(false);
+  };
+
+  const addSinglePuzzle = () => {
+    if (!customText.trim()) return;
+    const entry = {
+      id: `custom-${Date.now()}`,
+      category: customCategory.trim() || "eigen",
+      age: customAge,
+      prompt: customPrompt.trim() || undefined,
+      text: customText.trim().toUpperCase(),
+    };
+    const next = [...customPuzzles, entry];
+    setCustomPuzzles(next);
+    persistCustomPuzzles(next);
+    setCustomCategory("");
+    setCustomPrompt("");
+    setCustomText("");
+    setCsvFeedback(`"${entry.text}" toegevoegd aan de database.`);
+  };
+
+  const importCsv = () => {
+    const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const added = [];
+    lines.forEach((line, idx) => {
+      const parts = parseCsvLine(line);
+      if (parts.length < 3) return;
+      const [category, age, text, prompt] = parts;
+      if (!AGE_LABEL[age] || !text) return;
+      added.push({
+        id: `csv-${Date.now()}-${idx}`,
+        category: category || "eigen",
+        age,
+        text: text.toUpperCase(),
+        prompt: prompt || undefined,
+      });
+    });
+    if (added.length) {
+      const next = [...customPuzzles, ...added];
+      setCustomPuzzles(next);
+      persistCustomPuzzles(next);
+      setCsvText("");
+      setCsvFeedback(`${added.length} puzzel(s) toegevoegd.`);
+    } else {
+      setCsvFeedback("Geen geldige regels gevonden. Formaat per regel: categorie,leeftijd,tekst,vraag(optioneel)");
+    }
   };
 
   const endGame = () => setScreen("game-end");
@@ -457,7 +585,40 @@ export default function RadVanFortuin() {
         .key-btn { transition: transform 0.1s ease, filter 0.1s ease; }
         .spin-btn:active:not(:disabled) { transform: scale(0.95); }
         .age-chip { transition: all 0.15s ease; cursor: pointer; }
+        .gear-btn:hover { transform: rotate(25deg); }
+        .gear-btn { transition: transform 0.2s ease; }
       `}</style>
+
+      <button className="gear-btn" style={styles.gearBtn} onClick={() => setShowSettings(true)} title="Instellingen">
+        <Settings size={20} />
+      </button>
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          settingsTab={settingsTab}
+          setSettingsTab={setSettingsTab}
+          inGame={screen !== "start"}
+          onSkipPuzzle={skipPuzzle}
+          onRestartGame={restartGame}
+          ageFilter={ageFilter}
+          toggleAge={toggleAge}
+          customCategory={customCategory}
+          setCustomCategory={setCustomCategory}
+          customAge={customAge}
+          setCustomAge={setCustomAge}
+          customPrompt={customPrompt}
+          setCustomPrompt={setCustomPrompt}
+          customText={customText}
+          setCustomText={setCustomText}
+          onAddSingle={addSinglePuzzle}
+          csvText={csvText}
+          setCsvText={setCsvText}
+          onImportCsv={importCsv}
+          csvFeedback={csvFeedback}
+          customPuzzles={customPuzzles}
+        />
+      )}
 
       {screen === "start" && (
         <div style={styles.startWrap}>
@@ -541,11 +702,12 @@ export default function RadVanFortuin() {
               >
                 <div style={{ ...styles.scoreName, color: p.color }}>{p.name}</div>
                 <div style={styles.scoreValue}>{p.total}</div>
+                {p.doublers > 0 && <div style={styles.doublerBadge}>x2 ×{p.doublers}</div>}
               </div>
             ))}
           </div>
 
-          <div style={styles.categoryBadge}>{CATEGORY_LABEL[puzzle.category]}</div>
+          <div style={styles.categoryBadge}>{categoryLabel(puzzle.category)}</div>
           {puzzle.category === "vraag" && <div style={styles.promptText}>{puzzle.prompt}</div>}
 
           <div style={styles.board}>
@@ -597,6 +759,20 @@ export default function RadVanFortuin() {
               <div style={{ ...styles.guessValue, color: PLAYER_COLORS[currentIdx] }}>
                 {players[currentIdx]?.name} kiest een letter voor {pendingValue} punten
               </div>
+              {players[currentIdx]?.doublers > 0 && (
+                <button
+                  onClick={() => setDoublerActive((a) => !a)}
+                  style={{
+                    ...styles.doublerToggle,
+                    background: doublerActive ? "#E67E22" : "transparent",
+                    color: doublerActive ? "#141B2E" : "#E67E22",
+                  }}
+                >
+                  {doublerActive
+                    ? "Verdubbelaar actief (x2) — klik om te annuleren"
+                    : `Verdubbelaar inzetten (${players[currentIdx].doublers}x beschikbaar)`}
+                </button>
+              )}
               <div style={styles.keyboard}>
                 {ALPHABET.map((letter) => (
                   <button
@@ -738,6 +914,143 @@ function Wheel({ deg, spinning }) {
   );
 }
 
+function SettingsModal({
+  onClose, settingsTab, setSettingsTab, inGame, onSkipPuzzle, onRestartGame,
+  ageFilter, toggleAge,
+  customCategory, setCustomCategory, customAge, setCustomAge, customPrompt, setCustomPrompt, customText, setCustomText, onAddSingle,
+  csvText, setCsvText, onImportCsv, csvFeedback, customPuzzles,
+}) {
+  const TABS = [
+    { key: "beheer", label: "Spelbeheer" },
+    { key: "niveaus", label: "Niveaus" },
+    { key: "toevoegen", label: "Puzzel toevoegen" },
+    { key: "bulk", label: "Bulk (CSV)" },
+    { key: "help", label: "Handleiding" },
+  ];
+  return (
+    <div style={styles.settingsOverlay} onClick={onClose}>
+      <div style={styles.settingsCard} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.settingsHeader}>
+          <div style={styles.settingsTitle}>Instellingen</div>
+          <button style={styles.iconCloseBtn} onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <div style={styles.settingsTabs}>
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setSettingsTab(t.key)}
+              style={{
+                ...styles.settingsTabBtn,
+                background: settingsTab === t.key ? "#F2B705" : "transparent",
+                color: settingsTab === t.key ? "#141B2E" : "#D8DCF2",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={styles.settingsBody}>
+          {settingsTab === "beheer" && (
+            <div style={styles.settingsSection}>
+              {inGame ? (
+                <>
+                  <button style={styles.settingsActionBtn} onClick={onSkipPuzzle}>
+                    <SkipForward size={16} style={{ marginRight: 8 }} /> Ander woord (huidige puzzel overslaan)
+                  </button>
+                  <button style={{ ...styles.settingsActionBtn, borderColor: "#E85D75", color: "#E85D75" }} onClick={onRestartGame}>
+                    <RotateCcw size={16} style={{ marginRight: 8 }} /> Spel opnieuw starten
+                  </button>
+                </>
+              ) : (
+                <p style={styles.settingsHint}>Start eerst een spel — dan verschijnen hier "ander woord" en "opnieuw starten".</p>
+              )}
+            </div>
+          )}
+
+          {settingsTab === "niveaus" && (
+            <div style={styles.settingsSection}>
+              <p style={styles.settingsHint}>Welke niveaus mogen meedoen bij het kiezen van puzzels?</p>
+              <div style={styles.ageRow}>
+                {Object.keys(AGE_LABEL).map((key) => (
+                  <div
+                    key={key}
+                    className="age-chip"
+                    onClick={() => toggleAge(key)}
+                    style={{
+                      ...styles.ageChip,
+                      background: ageFilter[key] ? "rgba(242,183,5,0.2)" : "rgba(139,147,196,0.08)",
+                      borderColor: ageFilter[key] ? "#F2B705" : "rgba(139,147,196,0.3)",
+                      color: ageFilter[key] ? "#F2B705" : "#9BA1C9",
+                    }}
+                  >
+                    {AGE_LABEL[key]}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {settingsTab === "toevoegen" && (
+            <div style={styles.settingsSection}>
+              <p style={styles.settingsHint}>Voeg als kwismaster zelf één puzzel toe — bv. categorie "Film" met antwoord "TITANIC".</p>
+              <input style={styles.settingsInput} placeholder="Categorie (bv. Film, Muziek, Sport...)" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} />
+              <select style={styles.settingsInput} value={customAge} onChange={(e) => setCustomAge(e.target.value)}>
+                {Object.entries(AGE_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              <input style={styles.settingsInput} placeholder="Vraag/hint (optioneel)" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
+              <input style={styles.settingsInput} placeholder="Antwoord / te raden woord of zin" value={customText} onChange={(e) => setCustomText(e.target.value)} />
+              <button style={styles.settingsActionBtn} onClick={onAddSingle}>
+                <Plus size={16} style={{ marginRight: 8 }} /> Toevoegen
+              </button>
+              {csvFeedback && <p style={styles.settingsFeedback}>{csvFeedback}</p>}
+              <p style={styles.settingsHint}>Eigen puzzels tot nu toe: {customPuzzles.length}. Ze worden bewaard en blijven ook de volgende keer beschikbaar.</p>
+            </div>
+          )}
+
+          {settingsTab === "bulk" && (
+            <div style={styles.settingsSection}>
+              <p style={styles.settingsHint}>
+                Plak meerdere puzzels tegelijk, één per regel: <code>categorie,leeftijd,tekst,vraag(optioneel)</code><br />
+                Leeftijd moet exact zijn: <code>kind</code>, <code>jongvolwassen</code>, <code>volwassen_makkelijk</code> of <code>volwassen_moeilijk</code>.<br />
+                Voorbeeld: <code>Film,volwassen_makkelijk,TITANIC</code>
+              </p>
+              <textarea
+                style={styles.settingsTextarea}
+                rows={6}
+                placeholder={"Film,volwassen_makkelijk,TITANIC\nMuziek,kind,IN DE MANESCHIJN"}
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+              />
+              <button style={styles.settingsActionBtn} onClick={onImportCsv}>
+                <Plus size={16} style={{ marginRight: 8 }} /> Bulk toevoegen
+              </button>
+              {csvFeedback && <p style={styles.settingsFeedback}>{csvFeedback}</p>}
+            </div>
+          )}
+
+          {settingsTab === "help" && (
+            <div style={styles.settingsSection}>
+              <ol style={styles.helpList}>
+                <li>Draai aan het rad voor punten, of gebruik een gewonnen verdubbelaar/gratis letter.</li>
+                <li>Kies daarna een letter. Staat 'ie in de puzzel? Dan zie je 'm verschijnen en krijg je punten (waarde × aantal keer). Je mag opnieuw draaien.</li>
+                <li>Niet raak? Dan gaat de beurt naar de volgende speler.</li>
+                <li>Een <b>verdubbelaar</b> win je op het rad — zet 'm in vóór je een letter kiest waarvan je denkt dat die vaak voorkomt (bv. de E), dan tellen de punten dubbel.</li>
+                <li>Weet je de hele zin? Klik op "Zin oplossen" en typ 'm in — goed = ronde gewonnen (+500 bonus).</li>
+                <li>Elke speler kan via het tandwiel rechtsboven op elk moment "ander woord" kiezen of het spel opnieuw starten.</li>
+                <li>Voeg zelf puzzels toe (los of in bulk via CSV) onder de tabbladen hierboven — handig als kwismaster.</li>
+              </ol>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 // STYLES
 // ============================================================
@@ -830,4 +1143,34 @@ const styles = {
   gameoverTitle: { fontFamily: "Georgia, serif", fontSize: 34, margin: "0 0 18px" },
   finalScores: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 },
   finalScoreRow: { display: "flex", justifyContent: "space-between", fontFamily: "'Courier New', monospace", fontSize: 14, fontWeight: 700 },
+
+  gearBtn: {
+    position: "fixed", top: 14, right: 14, zIndex: 40,
+    width: 42, height: 42, borderRadius: "50%",
+    background: "rgba(20,27,77,0.8)", border: "1.5px solid #F2B705", color: "#F2B705",
+    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+  },
+  doublerBadge: {
+    marginTop: 4, fontFamily: "'Courier New', monospace", fontSize: 11, fontWeight: 800,
+    color: "#E67E22", border: "1px solid #E67E22", borderRadius: 999, padding: "2px 8px", display: "inline-block",
+  },
+  doublerToggle: {
+    border: "1.5px solid #E67E22", borderRadius: 999, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+  },
+
+  settingsOverlay: { position: "fixed", inset: 0, background: "rgba(6,9,28,0.85)", backdropFilter: "blur(4px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.2s ease-out", padding: 16 },
+  settingsCard: { background: "#141B4D", border: "1px solid rgba(242,183,5,0.3)", borderRadius: 18, width: "min(560px, 100%)", maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" },
+  settingsHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(139,147,196,0.2)" },
+  settingsTitle: { fontFamily: "Georgia, serif", fontSize: 20, color: "#F2B705" },
+  iconCloseBtn: { background: "transparent", border: "none", color: "#D8DCF2", cursor: "pointer" },
+  settingsTabs: { display: "flex", flexWrap: "wrap", gap: 6, padding: "12px 20px 0" },
+  settingsTabBtn: { border: "1px solid rgba(242,183,5,0.4)", borderRadius: 999, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" },
+  settingsBody: { padding: "16px 20px 22px", overflowY: "auto" },
+  settingsSection: { display: "flex", flexDirection: "column", gap: 10 },
+  settingsHint: { fontSize: 13, color: "#9BA1C9", lineHeight: 1.5 },
+  settingsInput: { background: "rgba(11,17,48,0.8)", border: "1.5px solid rgba(242,183,5,0.4)", borderRadius: 10, padding: "10px 14px", fontSize: 14, color: "#F5F3EA", outline: "none", fontFamily: "inherit" },
+  settingsTextarea: { background: "rgba(11,17,48,0.8)", border: "1.5px solid rgba(242,183,5,0.4)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#F5F3EA", outline: "none", fontFamily: "'Courier New', monospace", resize: "vertical" },
+  settingsActionBtn: { display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1.5px solid #F2B705", color: "#F2B705", borderRadius: 999, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" },
+  settingsFeedback: { fontSize: 13, color: "#2ECC71", fontWeight: 700 },
+  helpList: { paddingLeft: 20, display: "flex", flexDirection: "column", gap: 10, fontSize: 14, lineHeight: 1.5, color: "#F5F3EA" },
 };
