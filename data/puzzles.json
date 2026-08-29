@@ -1,0 +1,49 @@
+{
+  "_schema": {
+    "category": "gezegde | filmtitel | liedtitel | zin | vraag",
+    "age": "kind | jongvolwassen | volwassen_makkelijk | volwassen_moeilijk",
+    "prompt": "optioneel, alleen bij category 'vraag' — de vraag die boven het bord getoond wordt",
+    "text": "de zin/het antwoord dat geraden moet worden (wordt automatisch als hoofdletters getoond)"
+  },
+  "puzzles": [
+    { "id": "p1", "category": "gezegde", "age": "kind", "text": "BETER LAAT DAN NOOIT" },
+    { "id": "p2", "category": "gezegde", "age": "kind", "text": "DE VROEGE VOGEL VANGT DE WORM" },
+    { "id": "p3", "category": "gezegde", "age": "kind", "text": "AL DOENDE LEERT MEN" },
+    { "id": "p4", "category": "filmtitel", "age": "kind", "text": "DE LEEUWENKONING" },
+    { "id": "p5", "category": "filmtitel", "age": "kind", "text": "TOY STORY" },
+    { "id": "p6", "category": "filmtitel", "age": "kind", "text": "FROZEN" },
+    { "id": "p7", "category": "liedtitel", "age": "kind", "text": "IN DE MANESCHIJN" },
+    { "id": "p8", "category": "zin", "age": "kind", "text": "OEFENING BAART KUNST" },
+    { "id": "p33", "category": "vraag", "age": "kind", "prompt": "Hoe heet de baby van een hond?", "text": "PUPPY" },
+
+    { "id": "p9", "category": "gezegde", "age": "jongvolwassen", "text": "APPELS MET PEREN VERGELIJKEN" },
+    { "id": "p10", "category": "gezegde", "age": "jongvolwassen", "text": "EEN KAT IN DE ZAK KOPEN" },
+    { "id": "p11", "category": "gezegde", "age": "jongvolwassen", "text": "OP EIEREN LOPEN" },
+    { "id": "p12", "category": "filmtitel", "age": "jongvolwassen", "text": "HARRY POTTER" },
+    { "id": "p13", "category": "filmtitel", "age": "jongvolwassen", "text": "JURASSIC PARK" },
+    { "id": "p14", "category": "liedtitel", "age": "jongvolwassen", "text": "RADIO GAGA" },
+    { "id": "p15", "category": "liedtitel", "age": "jongvolwassen", "text": "ZOUTELANDE" },
+    { "id": "p16", "category": "zin", "age": "jongvolwassen", "text": "STILLE WATEREN HEBBEN DIEPE GRONDEN" },
+    { "id": "p34", "category": "vraag", "age": "jongvolwassen", "prompt": "Wat is de hoofdstad van Spanje?", "text": "MADRID" },
+
+    { "id": "p17", "category": "gezegde", "age": "volwassen_makkelijk", "text": "VAN DE REGEN IN DE DROP" },
+    { "id": "p18", "category": "gezegde", "age": "volwassen_makkelijk", "text": "MET DE DEUR IN HUIS VALLEN" },
+    { "id": "p19", "category": "gezegde", "age": "volwassen_makkelijk", "text": "BOTER BIJ DE VIS" },
+    { "id": "p20", "category": "filmtitel", "age": "volwassen_makkelijk", "text": "ZWARTBOEK" },
+    { "id": "p21", "category": "filmtitel", "age": "volwassen_makkelijk", "text": "SOOF" },
+    { "id": "p22", "category": "liedtitel", "age": "volwassen_makkelijk", "text": "VLIEGER" },
+    { "id": "p23", "category": "zin", "age": "volwassen_makkelijk", "text": "WIE KAATST MOET DE BAL VERWACHTEN" },
+    { "id": "p24", "category": "zin", "age": "volwassen_makkelijk", "text": "HOOGMOED KOMT VOOR DE VAL" },
+    { "id": "p35", "category": "vraag", "age": "volwassen_makkelijk", "prompt": "Welk element heeft chemisch symbool Au?", "text": "GOUD" },
+
+    { "id": "p25", "category": "gezegde", "age": "volwassen_moeilijk", "text": "DE KOGEL IS DOOR DE KERK" },
+    { "id": "p26", "category": "gezegde", "age": "volwassen_moeilijk", "text": "IEMAND EEN HAK ZETTEN" },
+    { "id": "p27", "category": "gezegde", "age": "volwassen_moeilijk", "text": "OP GROTE VOET LEVEN" },
+    { "id": "p28", "category": "gezegde", "age": "volwassen_moeilijk", "text": "HET ONDERSTE UIT DE KAN WILLEN" },
+    { "id": "p29", "category": "filmtitel", "age": "volwassen_moeilijk", "text": "THE GODFATHER" },
+    { "id": "p30", "category": "filmtitel", "age": "volwassen_moeilijk", "text": "TITANIC" },
+    { "id": "p31", "category": "liedtitel", "age": "volwassen_moeilijk", "text": "BLOED ZWEET EN TRANEN" },
+    { "id": "p32", "category": "zin", "age": "volwassen_moeilijk", "text": "DE KOEK IS OP" },
+    { "id": "p36", "category": "vraag", "age": "volwassen_moeilijk", "prompt": "Wie schreef de roman '1984'?", "text": "GEORGE ORWELL" }
+  ]
+}
