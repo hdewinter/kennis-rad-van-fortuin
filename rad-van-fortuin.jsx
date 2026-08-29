@@ -133,6 +133,91 @@ function shade(hex, percent) {
   b = Math.min(255, Math.max(0, b));
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
+
+// --- Geluid (Web Audio, geen externe bestanden nodig) ---
+let sharedAudioCtx = null;
+function getAudioCtx() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!sharedAudioCtx) sharedAudioCtx = new Ctx();
+    if (sharedAudioCtx.state === "suspended") sharedAudioCtx.resume();
+    return sharedAudioCtx;
+  } catch (e) {
+    return null;
+  }
+}
+function playClick(volume = 0.18) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(1200, now);
+  gain.gain.setValueAtTime(volume, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.07);
+}
+function playLandChime() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  [523.25, 659.25, 783.99].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0.0001, now + i * 0.05);
+    gain.gain.linearRampToValueAtTime(0.22, now + i * 0.05 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.05 + 0.5);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now + i * 0.05);
+    osc.stop(now + i * 0.05 + 0.55);
+  });
+}
+function playCorrectBlip() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(660, now);
+  osc.frequency.exponentialRampToValueAtTime(990, now + 0.15);
+  gain.gain.setValueAtTime(0.22, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.22);
+}
+function playWrongBuzz() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(160, now);
+  osc.frequency.exponentialRampToValueAtTime(90, now + 0.3);
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.34);
+}
+// Plant klik-momenten die uitdoven zoals een echt rad met pinnetjes (snel -> langzaam)
+function scheduleSpinClicks(durationMs) {
+  const ticks = 26;
+  for (let i = 0; i < ticks; i++) {
+    const t = i / (ticks - 1);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic, zelfde gevoel als de rad-animatie
+    const delay = eased * durationMs;
+    setTimeout(() => playClick(), delay);
+  }
+}
 function polar(cx, cy, r, angleDeg) {
   const a = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -244,8 +329,10 @@ export default function RadVanFortuin() {
     const extra = (targetMod - curMod + 360) % 360;
     const newDeg = wheelDeg + 5 * 360 + extra;
     setWheelDeg(newDeg);
+    scheduleSpinClicks(4000);
     setTimeout(() => {
       setSpinning(false);
+      playLandChime();
       const seg = WHEEL_SEGMENTS[spinResultRef.current];
       handleSpinResult(seg);
     }, 4000);
@@ -258,6 +345,7 @@ export default function RadVanFortuin() {
       return;
     }
     if (seg.value === "BANKROET") {
+      playWrongBuzz();
       setPlayers((ps) => ps.map((p, i) => (i === currentIdx ? { ...p, total: p.total - p.puzzleScore, puzzleScore: 0 } : p)));
       setMessage(`Bankroet! ${players[currentIdx]?.name} verliest de punten van deze puzzel.`);
       advanceTurn();
@@ -294,6 +382,7 @@ export default function RadVanFortuin() {
     setUsedLetters(nextUsed);
     const count = puzzle.text.toUpperCase().split("").filter((ch) => ch === letter).length;
     if (count > 0) {
+      playCorrectBlip();
       const points = pendingValue * count;
       setPlayers((ps) => ps.map((p, i) => (i === currentIdx ? { ...p, total: p.total + points, puzzleScore: p.puzzleScore + points } : p)));
       const nextRevealed = new Set(revealed);
@@ -307,6 +396,7 @@ export default function RadVanFortuin() {
         setScreen("wheel");
       }
     } else {
+      playWrongBuzz();
       setMessage(`"${letter}" komt niet voor. Beurt gaat naar de volgende speler.`);
       advanceTurn();
       setScreen("wheel");
@@ -332,8 +422,10 @@ export default function RadVanFortuin() {
     const guess = normalize(solveInput);
     const target = normalize(puzzle.text);
     if (guess.length > 0 && guess === target) {
+      playLandChime();
       finishRound(currentIdx, SOLVE_BONUS);
     } else {
+      playWrongBuzz();
       setMessage(`Helaas, dat is niet juist. Beurt gaat naar de volgende speler.`);
       advanceTurn();
       setScreen("wheel");
@@ -468,7 +560,10 @@ export default function RadVanFortuin() {
                       key={ci}
                       style={{
                         ...styles.tile,
-                        background: shown ? "linear-gradient(160deg, #F7F2DE, #E9E1C0)" : "linear-gradient(160deg, #1F8C79, #0E4A40)",
+                        background: shown
+                          ? "linear-gradient(160deg, #FBF7E8, #ECE2C0)"
+                          : "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.18), transparent 55%), repeating-linear-gradient(45deg, #1B8874 0px, #1B8874 5px, #11604E 5px, #11604E 10px)",
+                        border: shown ? "2px solid #C9BD8F" : "2px solid #0A2A22",
                         animation: shown && isAlpha ? "tileIn 0.35s ease-out" : justFreed ? "freeLetterGlow 1.2s ease-in-out" : "none",
                       }}
                     >
@@ -680,9 +775,31 @@ const styles = {
   categoryBadge: { fontFamily: "'Courier New', monospace", fontSize: 12, letterSpacing: "0.15em", color: "#F2B705", border: "1px solid #F2B705", borderRadius: 999, padding: "4px 14px" },
   promptText: { fontFamily: "Georgia, serif", fontSize: "clamp(15px, 2vw, 19px)", color: "#F5F3EA", textAlign: "center", maxWidth: 700 },
 
-  board: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "clamp(10px, 2vw, 20px)", background: "rgba(20,27,77,0.4)", border: "1px solid rgba(242,183,5,0.2)", borderRadius: 16, padding: "clamp(14px, 2vw, 24px)" },
+  board: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "clamp(10px, 2vw, 20px)",
+    background: "linear-gradient(155deg, #1B2461, #0D1338)",
+    border: "3px solid #F2B705",
+    borderRadius: 20,
+    padding: "clamp(16px, 2.4vw, 28px)",
+    boxShadow: "0 16px 40px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.08)",
+  },
   wordGroup: { display: "flex", gap: "clamp(3px, 0.6vw, 6px)" },
-  tile: { width: "clamp(24px, 4.5vw, 38px)", height: "clamp(30px, 5.5vw, 46px)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "clamp(14px, 2.4vw, 20px)", color: "#141B2E", boxShadow: "0 2px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15)" },
+  tile: {
+    width: "clamp(26px, 4.6vw, 40px)",
+    height: "clamp(32px, 5.8vw, 48px)",
+    borderRadius: 4,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 800,
+    fontFamily: "Georgia, 'Times New Roman', serif",
+    fontSize: "clamp(15px, 2.5vw, 21px)",
+    color: "#141B2E",
+    boxShadow: "0 3px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+  },
 
   messageBar: { fontFamily: "'Courier New', monospace", fontSize: 13, color: "#F2B705", textAlign: "center", minHeight: 18 },
 
