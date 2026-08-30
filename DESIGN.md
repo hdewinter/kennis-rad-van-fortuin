@@ -31,12 +31,12 @@ Bij spelstart kies je welke niveaus meedoen (chips aan/uit). De categorie
 "vraag" hergebruikt het idee van de vragenbank uit "Kennis op een Rij":
 `prompt` toont de vraag, `text` is het antwoord dat op het bord verschijnt.
 
-> **Belangrijk voor beheer:** de huidige speel-versie (`rad-van-fortuin.jsx`)
-> heeft de puzzels nog **inline** in de code staan (zelfde inhoud als
-> `data/puzzles.json`), omdat het artifact geen bestanden kan inladen tijdens
-> het testen in de chat. Zodra dit een echte web-app wordt (bijv. via Vite),
-> laden we `data/puzzles.json` in plaats van de inline lijst — dan hoef je
-> nog maar op één plek te bewerken.
+> **Belangrijk voor beheer:** de code (`rad-van-fortuin.jsx`) heeft de
+> puzzels nog **inline** staan (zelfde inhoud als `data/puzzles.json`) als
+> terugval, omdat het Claude-artifact bij het testen in de chat geen losse
+> bestanden kan inladen. De gedeployde web-app (GitHub Pages) laadt bij de
+> eerste start wél echt `data/puzzles.json` in — daarna staat de database
+> in de browser-opslag en bewerk je verder via het instellingenmenu.
 
 ## Scoring
 - Score per speler is cumulatief over alle puzzels in het spel.
@@ -68,9 +68,25 @@ op de kaart`, los van de permanente statusregel onder het bord.
 - [x] Opzet gedeeld en afgestemd in gesprek
 - [x] Eerste speelbare versie gebouwd (`rad-van-fortuin.jsx`)
 - [x] Voorbeeld-database met 36 puzzels (9 per niveau, verdeeld over categorieën)
+- [x] Live web-app op GitHub Pages: https://hdewinter.github.io/kennis-rad-van-fortuin/
+- [x] `data/puzzles.json` wordt op de live site echt ingeladen (build via esbuild, broncode in `src/` op de `gh-pages`-branch is niet nodig — het gebundelde resultaat staat daar)
+- [x] Rad is 3D (perspectief-tilt, kegelverloop per vak, metalen rand met bouten) en heeft lampjes die chasen tijdens het draaien en fel oplichten op het gewonnen vak, net als een echt rad
 - [ ] Testen/feedback vanuit de speler
-- [ ] Eventueel: los data-bestand echt inladen (build-stap) i.p.v. inline lijst
 - [ ] Eventueel: geluid bij draaien/bankroet/oplossen (zoals bij "Kennis op een Rij")
+
+## Deployment
+- **Live site**: https://hdewinter.github.io/kennis-rad-van-fortuin/ (GitHub Pages,
+  branch `gh-pages`, gebundeld met esbuild — React + lucide-react + de app
+  in één `bundle.js`, plus `index.html` en `data/puzzles.json`)
+- **Broncode**: staat op `main` (`rad-van-fortuin.jsx` + `data/puzzles.json`);
+  dit is ook de versie die je als Claude-artifact in de chat kunt testen
+- Buiten een Claude-artifact bestaat `window.storage` niet — de gebundelde
+  site bevat daarom een kleine shim die dezelfde API aanbiedt maar alles in
+  `localStorage` van de browser bewaart (per toestel)
+- Om de live site opnieuw te bouwen na een wijziging in `rad-van-fortuin.jsx`:
+  bundel met esbuild (React + react-dom + lucide-react als dependencies) naar
+  `bundle.js`, kopieer `data/puzzles.json` mee, en push die drie bestanden
+  (`index.html`, `bundle.js`, `data/puzzles.json`) naar de `gh-pages`-branch
 
 ## Verwant project
 Het bordspel "Kennis op een Rij" (4-op-een-rij met buzzer-quiz) is een apart

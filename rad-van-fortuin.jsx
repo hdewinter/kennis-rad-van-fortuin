@@ -226,6 +226,16 @@ function scheduleSpinClicks(durationMs) {
     setTimeout(() => playClick(), delay);
   }
 }
+// Maakt een hexkleur lichter (0-1 = percentage richting wit) — voor het kegel/dish-verloop op de vakken
+function lighten(hex, amt) {
+  const h = hex.replace("#", "");
+  const num = parseInt(h, 16);
+  let r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+  r = Math.round(r + (255 - r) * amt);
+  g = Math.round(g + (255 - g) * amt);
+  b = Math.round(b + (255 - b) * amt);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 function polar(cx, cy, r, angleDeg) {
   const a = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -273,6 +283,7 @@ export default function RadVanFortuin() {
   const [usedLetters, setUsedLetters] = useState(new Set());
   const [wheelDeg, setWheelDeg] = useState(0);
   const [spinning, setSpinning] = useState(false);
+  const [litIndex, setLitIndex] = useState(null); // index van het vak dat oplicht na het draaien
   const [pendingValue, setPendingValue] = useState(null);
   const [message, setMessage] = useState("");
   const [solveInput, setSolveInput] = useState("");
@@ -303,7 +314,20 @@ export default function RadVanFortuin() {
           return;
         }
       } catch (e) {
-        /* nog geen eigen database opgeslagen — start met de standaardset */
+        /* nog geen eigen database opgeslagen — probeer het losse databestand */
+      }
+      try {
+        const resp = await fetch("data/puzzles.json");
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json && Array.isArray(json.puzzles) && json.puzzles.length) {
+            setPuzzleDb(json.puzzles);
+            persistPuzzleDb(json.puzzles);
+            return;
+          }
+        }
+      } catch (e) {
+        /* data/puzzles.json niet bereikbaar (bv. binnen een Claude-artifact) — val terug op de inline lijst */
       }
       setPuzzleDb(PUZZLES);
       persistPuzzleDb(PUZZLES);
@@ -387,6 +411,7 @@ export default function RadVanFortuin() {
   const spin = () => {
     if (spinning || screen !== "wheel") return;
     setSpinning(true);
+    setLitIndex(null);
     setMessage("");
     const idx = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
     spinResultRef.current = idx;
@@ -400,6 +425,7 @@ export default function RadVanFortuin() {
     scheduleSpinClicks(4000);
     setTimeout(() => {
       setSpinning(false);
+      setLitIndex(spinResultRef.current);
       playLandChime();
       const seg = WHEEL_SEGMENTS[spinResultRef.current];
       handleSpinResult(seg);
@@ -626,6 +652,11 @@ export default function RadVanFortuin() {
         .gear-btn:hover { transform: rotate(25deg); }
         .gear-btn { transition: transform 0.2s ease; }
         @keyframes splashPop { 0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; } 20% { transform: translate(-50%,-50%) scale(1.08); opacity: 1; } 75% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.95); opacity: 0; } }
+        @keyframes bulbChase { 0%, 40% { opacity: 1; } 41%, 100% { opacity: 0.15; } }
+        @keyframes bulbIdle { 0% { opacity: 0.45; } 100% { opacity: 0.85; } }
+        @keyframes bulbBright { 0% { opacity: 0.85; } 100% { opacity: 1; } }
+        @keyframes wedgeFlash { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.55) saturate(1.2); } }
+        @keyframes wedgeFlashOverlay { 0% { opacity: 0; } 50% { opacity: 0.5; } 100% { opacity: 0; } }
       `}</style>
 
       {wrongFlash && (
@@ -796,7 +827,7 @@ export default function RadVanFortuin() {
 
           {screen === "wheel" && (
             <div style={styles.wheelArea}>
-              <Wheel deg={wheelDeg} spinning={spinning} />
+              <Wheel deg={wheelDeg} spinning={spinning} litIndex={litIndex} />
               <div style={styles.wheelControls}>
                 <button className="spin-btn" style={styles.spinBtn} disabled={spinning} onClick={spin}>
                   <Shuffle size={18} style={{ marginRight: 8 }} />
@@ -925,46 +956,140 @@ export default function RadVanFortuin() {
   );
 }
 
-function Wheel({ deg, spinning }) {
+function Wheel({ deg, spinning, litIndex }) {
   const cx = 150, cy = 150, r = 145;
   const span = 360 / WHEEL_SEGMENTS.length;
+  const n = WHEEL_SEGMENTS.length;
+  // twee lampjes per vak (op de scheidingslijnen) — net als bij een echt rad
+  const bulbCount = n * 2;
+  const bulbR = r + 3;
+
   return (
-    <div style={styles.wheelWrap}>
-      <div style={styles.wheelPointer} />
-      <svg
-        viewBox="0 0 300 300"
-        style={{
-          width: "min(70vw, 340px)",
-          height: "min(70vw, 340px)",
-          transform: `rotate(${deg}deg)`,
-          transition: spinning ? "transform 4s cubic-bezier(0.15, 0.85, 0.25, 1)" : "none",
-        }}
-      >
-        <circle cx={cx} cy={cy} r={r + 6} fill="#141B4D" stroke="#F2B705" strokeWidth="4" />
-        {WHEEL_SEGMENTS.map((seg, i) => {
-          const start = i * span, end = (i + 1) * span, mid = start + span / 2;
-          const labelPos = polar(cx, cy, r * 0.68, mid);
-          return (
-            <g key={i}>
-              <path d={slicesPath(cx, cy, r, start, end)} fill={segColor(seg, i)} stroke="#0B1130" strokeWidth="1.5" />
-              <text
-                x={labelPos.x}
-                y={labelPos.y}
-                fill={seg.type === "special" ? "#fff" : "#141B2E"}
-                fontSize={seg.type === "special" ? 10 : 15}
-                fontWeight="800"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                transform={`rotate(${mid} ${labelPos.x} ${labelPos.y})`}
-                fontFamily="'Courier New', monospace"
-              >
-                {segLabel(seg)}
-              </text>
-            </g>
-          );
-        })}
-        <circle cx={cx} cy={cy} r={22} fill="#F2B705" stroke="#141B2E" strokeWidth="3" />
-      </svg>
+    <div style={styles.wheelStage}>
+      <div style={styles.wheelWrap}>
+        <div style={styles.wheelPointer} />
+        <div style={styles.wheelGroundShadow} />
+        <svg
+          viewBox="0 0 300 300"
+          style={{
+            width: "min(70vw, 340px)",
+            height: "min(70vw, 340px)",
+            transform: `rotateX(22deg) rotate(${deg}deg)`,
+            transformStyle: "preserve-3d",
+            transition: spinning ? "transform 4s cubic-bezier(0.15, 0.85, 0.25, 1)" : "transform 0.6s ease",
+            filter: "drop-shadow(0 18px 20px rgba(0,0,0,0.55))",
+          }}
+        >
+          <defs>
+            {POINT_COLORS.map((c) => (
+              <radialGradient key={c} id={`grad-${c.replace("#", "")}`} cx="50%" cy="50%" r="75%">
+                <stop offset="0%" stopColor={lighten(c, 0.55)} />
+                <stop offset="55%" stopColor={lighten(c, 0.12)} />
+                <stop offset="100%" stopColor={c} />
+              </radialGradient>
+            ))}
+            {Object.values(SPECIAL_COLOR).map((c) => (
+              <radialGradient key={c} id={`grad-${c.replace("#", "")}`} cx="50%" cy="50%" r="75%">
+                <stop offset="0%" stopColor={lighten(c, 0.5)} />
+                <stop offset="55%" stopColor={lighten(c, 0.1)} />
+                <stop offset="100%" stopColor={c} />
+              </radialGradient>
+            ))}
+            <radialGradient id="hubGrad" cx="38%" cy="32%" r="70%">
+              <stop offset="0%" stopColor="#FFF3C4" />
+              <stop offset="45%" stopColor="#F2B705" />
+              <stop offset="100%" stopColor="#B8860B" />
+            </radialGradient>
+            <linearGradient id="rimGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+              <stop offset="0%" stopColor="#FFE9A3" />
+              <stop offset="30%" stopColor="#C98F1E" />
+              <stop offset="55%" stopColor="#8A5D0E" />
+              <stop offset="80%" stopColor="#F2B705" />
+              <stop offset="100%" stopColor="#7A5108" />
+            </linearGradient>
+            <radialGradient id="bulbGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FFFCEB" stopOpacity="1" />
+              <stop offset="45%" stopColor="#FFDE7A" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#FFDE7A" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* buitenste metalen rand, met dieptelaag eronder */}
+          <circle cx={cx} cy={cy} r={r + 15} fill="#0B1130" />
+          <circle cx={cx} cy={cy} r={r + 13} fill="none" stroke="url(#rimGrad)" strokeWidth="11" />
+          <circle cx={cx} cy={cy} r={r + 7.5} fill="none" stroke="#0B1130" strokeWidth="2" />
+
+          {/* bouten op de rand */}
+          {Array.from({ length: n }).map((_, i) => {
+            const p = polar(cx, cy, r + 13, i * span);
+            return <circle key={`bolt-${i}`} cx={p.x} cy={p.y} r={2.6} fill="#4A3208" stroke="#F2D98A" strokeWidth="0.6" />;
+          })}
+
+          {WHEEL_SEGMENTS.map((seg, i) => {
+            const start = i * span, end = (i + 1) * span, mid = start + span / 2;
+            const labelPos = polar(cx, cy, r * 0.68, mid);
+            const baseColor = segColor(seg, i);
+            const isLit = litIndex === i;
+            return (
+              <g key={i} style={isLit ? { animation: "wedgeFlash 0.9s ease-in-out 2" } : undefined}>
+                <path
+                  d={slicesPath(cx, cy, r, start, end)}
+                  fill={`url(#grad-${baseColor.replace("#", "")})`}
+                  stroke="#0B1130"
+                  strokeWidth="1.5"
+                />
+                {isLit && (
+                  <path d={slicesPath(cx, cy, r, start, end)} fill="#FFFFFF" opacity="0" style={{ animation: "wedgeFlashOverlay 0.9s ease-in-out 2" }} />
+                )}
+                <text
+                  x={labelPos.x}
+                  y={labelPos.y}
+                  fill={seg.type === "special" ? "#fff" : "#141B2E"}
+                  fontSize={seg.type === "special" ? 10 : 15}
+                  fontWeight="800"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  transform={`rotate(${mid} ${labelPos.x} ${labelPos.y})`}
+                  fontFamily="'Courier New', monospace"
+                >
+                  {segLabel(seg)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* lampjes op de rand — chasen tijdens het draaien, gloeien vol op het gewonnen vak */}
+          {Array.from({ length: bulbCount }).map((_, i) => {
+            const angle = i * (360 / bulbCount);
+            const p = polar(cx, cy, bulbR, angle);
+            const nearLit = litIndex !== null && Math.abs(((angle - (litIndex * span + span / 2) + 540) % 360) - 180) < span * 0.6;
+            const delay = -(i / bulbCount) * 0.9;
+            return (
+              <g key={`bulb-${i}`}>
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={nearLit ? 9 : 6}
+                  fill="url(#bulbGlow)"
+                  style={{
+                    animation: spinning
+                      ? `bulbChase 0.9s linear infinite`
+                      : nearLit
+                      ? "bulbBright 0.5s ease-in-out infinite alternate"
+                      : "bulbIdle 2.4s ease-in-out infinite alternate",
+                    animationDelay: spinning ? `${delay}s` : `${(i % 5) * 0.15}s`,
+                  }}
+                />
+                <circle cx={p.x} cy={p.y} r={2.2} fill={nearLit ? "#FFFDF2" : "#FFE9A8"} stroke="#8A5D0E" strokeWidth="0.5" />
+              </g>
+            );
+          })}
+
+          <circle cx={cx} cy={cy} r={26} fill="#0B1130" />
+          <circle cx={cx} cy={cy} r={22} fill="url(#hubGrad)" stroke="#141B2E" strokeWidth="3" />
+          <circle cx={cx - 6} cy={cy - 8} r={6} fill="#FFFDEB" opacity="0.65" />
+        </svg>
+      </div>
     </div>
   );
 }
@@ -1226,7 +1351,9 @@ const styles = {
   messageBar: { fontFamily: "'Courier New', monospace", fontSize: 13, color: "#F2B705", textAlign: "center", minHeight: 18 },
 
   wheelArea: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 },
+  wheelStage: { perspective: "1200px" },
   wheelWrap: { position: "relative", display: "flex", justifyContent: "center" },
+  wheelGroundShadow: { position: "absolute", bottom: -14, left: "50%", transform: "translateX(-50%)", width: "72%", height: 22, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.55), rgba(0,0,0,0) 70%)", zIndex: 0 },
   wheelPointer: { position: "absolute", top: -6, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "14px solid transparent", borderRight: "14px solid transparent", borderTop: "22px solid #F2B705", zIndex: 5, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.5))" },
   wheelControls: { display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center" },
   spinBtn: { display: "flex", alignItems: "center", background: "#F2B705", color: "#141B2E", border: "none", borderRadius: 999, padding: "14px 26px", fontSize: 15, fontWeight: 800, cursor: "pointer" },
