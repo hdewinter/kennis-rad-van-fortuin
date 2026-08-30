@@ -969,17 +969,17 @@ function Wheel({ deg, spinning, litIndex }) {
       <div style={styles.wheelWrap}>
         <div style={styles.wheelPointer} />
         <div style={styles.wheelGroundShadow} />
-        <svg
-          viewBox="0 0 300 300"
-          style={{
-            width: "min(70vw, 340px)",
-            height: "min(70vw, 340px)",
-            transform: `rotateX(22deg) rotate(${deg}deg)`,
-            transformStyle: "preserve-3d",
-            transition: spinning ? "transform 4s cubic-bezier(0.15, 0.85, 0.25, 1)" : "transform 0.6s ease",
-            filter: "drop-shadow(0 18px 20px rgba(0,0,0,0.55))",
-          }}
-        >
+        <div style={styles.wheelTilt}>
+          <svg
+            viewBox="0 0 300 300"
+            style={{
+              width: "min(70vw, 340px)",
+              height: "min(70vw, 340px)",
+              transform: `rotate(${deg}deg)`,
+              transition: spinning ? "transform 4s cubic-bezier(0.15, 0.85, 0.25, 1)" : "none",
+              filter: "drop-shadow(0 18px 20px rgba(0,0,0,0.55))",
+            }}
+          >
           <defs>
             {POINT_COLORS.map((c) => (
               <radialGradient key={c} id={`grad-${c.replace("#", "")}`} cx="50%" cy="50%" r="75%">
@@ -1088,7 +1088,8 @@ function Wheel({ deg, spinning, litIndex }) {
           <circle cx={cx} cy={cy} r={26} fill="#0B1130" />
           <circle cx={cx} cy={cy} r={22} fill="url(#hubGrad)" stroke="#141B2E" strokeWidth="3" />
           <circle cx={cx - 6} cy={cy - 8} r={6} fill="#FFFDEB" opacity="0.65" />
-        </svg>
+          </svg>
+        </div>
       </div>
     </div>
   );
@@ -1352,6 +1353,7 @@ const styles = {
 
   wheelArea: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 },
   wheelStage: { perspective: "1200px" },
+  wheelTilt: { transform: "rotateX(20deg)", transformStyle: "preserve-3d" },
   wheelWrap: { position: "relative", display: "flex", justifyContent: "center" },
   wheelGroundShadow: { position: "absolute", bottom: -14, left: "50%", transform: "translateX(-50%)", width: "72%", height: 22, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.55), rgba(0,0,0,0) 70%)", zIndex: 0 },
   wheelPointer: { position: "absolute", top: -6, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "14px solid transparent", borderRight: "14px solid transparent", borderTop: "22px solid #F2B705", zIndex: 5, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.5))" },
