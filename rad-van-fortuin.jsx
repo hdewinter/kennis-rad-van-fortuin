@@ -281,35 +281,48 @@ export default function RadVanFortuin() {
   const [doublerActive, setDoublerActive] = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("beheer"); // beheer | toevoegen | bulk | help
-  const [customPuzzles, setCustomPuzzles] = useState([]);
+  const [settingsTab, setSettingsTab] = useState("beheer"); // beheer | niveaus | beheerpuzzels | toevoegen | bulk | help
+  const [puzzleDb, setPuzzleDb] = useState(null); // null = nog niet geladen
+  const [categoryMgmtFilter, setCategoryMgmtFilter] = useState("alle");
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({ category: "", age: "kind", prompt: "", text: "" });
   const [customCategory, setCustomCategory] = useState("");
   const [customAge, setCustomAge] = useState("volwassen_makkelijk");
   const [customPrompt, setCustomPrompt] = useState("");
   const [customText, setCustomText] = useState("");
   const [csvText, setCsvText] = useState("");
   const [csvFeedback, setCsvFeedback] = useState("");
+  const [wrongFlash, setWrongFlash] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await window.storage.get("custom-puzzles", false);
-        if (res && res.value) setCustomPuzzles(JSON.parse(res.value));
+        const res = await window.storage.get("puzzle-db", false);
+        if (res && res.value) {
+          setPuzzleDb(JSON.parse(res.value));
+          return;
+        }
       } catch (e) {
-        /* nog geen eigen puzzels opgeslagen — prima */
+        /* nog geen eigen database opgeslagen — start met de standaardset */
       }
+      setPuzzleDb(PUZZLES);
+      persistPuzzleDb(PUZZLES);
     })();
   }, []);
 
-  const persistCustomPuzzles = async (list) => {
+  const persistPuzzleDb = async (list) => {
     try {
-      await window.storage.set("custom-puzzles", JSON.stringify(list), false);
+      await window.storage.set("puzzle-db", JSON.stringify(list), false);
     } catch (e) {
       /* opslaan mislukt — speel gewoon door, alleen niet blijvend bewaard */
     }
   };
 
-  const ALL_PUZZLES = useMemo(() => [...PUZZLES, ...customPuzzles], [customPuzzles]);
+  const ALL_PUZZLES = puzzleDb || PUZZLES;
+  const categoriesInDb = useMemo(() => {
+    const set = new Set(ALL_PUZZLES.map((p) => p.category));
+    return ["alle", ...Array.from(set)];
+  }, [ALL_PUZZLES]);
 
   const spinResultRef = useRef(null);
 
@@ -462,6 +475,8 @@ export default function RadVanFortuin() {
     } else {
       playWrongBuzz();
       setDoublerActive(false);
+      setWrongFlash(letter);
+      setTimeout(() => setWrongFlash(null), 1200);
       setMessage(`"${letter}" komt niet voor. Beurt gaat naar de volgende speler.`);
       advanceTurn();
       setScreen("wheel");
@@ -530,9 +545,9 @@ export default function RadVanFortuin() {
       prompt: customPrompt.trim() || undefined,
       text: customText.trim().toUpperCase(),
     };
-    const next = [...customPuzzles, entry];
-    setCustomPuzzles(next);
-    persistCustomPuzzles(next);
+    const next = [...ALL_PUZZLES, entry];
+    setPuzzleDb(next);
+    persistPuzzleDb(next);
     setCustomCategory("");
     setCustomPrompt("");
     setCustomText("");
@@ -556,14 +571,37 @@ export default function RadVanFortuin() {
       });
     });
     if (added.length) {
-      const next = [...customPuzzles, ...added];
-      setCustomPuzzles(next);
-      persistCustomPuzzles(next);
+      const next = [...ALL_PUZZLES, ...added];
+      setPuzzleDb(next);
+      persistPuzzleDb(next);
       setCsvText("");
       setCsvFeedback(`${added.length} puzzel(s) toegevoegd.`);
     } else {
       setCsvFeedback("Geen geldige regels gevonden. Formaat per regel: categorie,leeftijd,tekst,vraag(optioneel)");
     }
+  };
+
+  const startEditPuzzle = (p) => {
+    setEditingId(p.id);
+    setEditDraft({ category: p.category, age: p.age, prompt: p.prompt || "", text: p.text });
+  };
+  const cancelEditPuzzle = () => setEditingId(null);
+  const saveEditPuzzle = () => {
+    if (!editDraft.text.trim()) return;
+    const next = ALL_PUZZLES.map((p) =>
+      p.id === editingId
+        ? { ...p, category: editDraft.category.trim() || "eigen", age: editDraft.age, prompt: editDraft.prompt.trim() || undefined, text: editDraft.text.trim().toUpperCase() }
+        : p
+    );
+    setPuzzleDb(next);
+    persistPuzzleDb(next);
+    setEditingId(null);
+  };
+  const deletePuzzleEntry = (id) => {
+    if (!window.confirm("Deze puzzel definitief verwijderen?")) return;
+    const next = ALL_PUZZLES.filter((p) => p.id !== id);
+    setPuzzleDb(next);
+    persistPuzzleDb(next);
   };
 
   const endGame = () => setScreen("game-end");
@@ -587,7 +625,14 @@ export default function RadVanFortuin() {
         .age-chip { transition: all 0.15s ease; cursor: pointer; }
         .gear-btn:hover { transform: rotate(25deg); }
         .gear-btn { transition: transform 0.2s ease; }
+        @keyframes splashPop { 0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; } 20% { transform: translate(-50%,-50%) scale(1.08); opacity: 1; } 75% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.95); opacity: 0; } }
       `}</style>
+
+      {wrongFlash && (
+        <div style={styles.wrongSplash}>
+          "{wrongFlash}" staat niet op de kaart
+        </div>
+      )}
 
       <button className="gear-btn" style={styles.gearBtn} onClick={() => setShowSettings(true)} title="Instellingen">
         <Settings size={20} />
@@ -616,7 +661,17 @@ export default function RadVanFortuin() {
           setCsvText={setCsvText}
           onImportCsv={importCsv}
           csvFeedback={csvFeedback}
-          customPuzzles={customPuzzles}
+          allPuzzles={ALL_PUZZLES}
+          categoriesInDb={categoriesInDb}
+          categoryMgmtFilter={categoryMgmtFilter}
+          setCategoryMgmtFilter={setCategoryMgmtFilter}
+          editingId={editingId}
+          editDraft={editDraft}
+          setEditDraft={setEditDraft}
+          onStartEdit={startEditPuzzle}
+          onCancelEdit={cancelEditPuzzle}
+          onSaveEdit={saveEditPuzzle}
+          onDelete={deletePuzzleEntry}
         />
       )}
 
@@ -918,15 +973,19 @@ function SettingsModal({
   onClose, settingsTab, setSettingsTab, inGame, onSkipPuzzle, onRestartGame,
   ageFilter, toggleAge,
   customCategory, setCustomCategory, customAge, setCustomAge, customPrompt, setCustomPrompt, customText, setCustomText, onAddSingle,
-  csvText, setCsvText, onImportCsv, csvFeedback, customPuzzles,
+  csvText, setCsvText, onImportCsv, csvFeedback,
+  allPuzzles, categoriesInDb, categoryMgmtFilter, setCategoryMgmtFilter,
+  editingId, editDraft, setEditDraft, onStartEdit, onCancelEdit, onSaveEdit, onDelete,
 }) {
   const TABS = [
     { key: "beheer", label: "Spelbeheer" },
     { key: "niveaus", label: "Niveaus" },
+    { key: "categorieen", label: "Categorieën" },
     { key: "toevoegen", label: "Puzzel toevoegen" },
     { key: "bulk", label: "Bulk (CSV)" },
     { key: "help", label: "Handleiding" },
   ];
+  const filteredPuzzles = categoryMgmtFilter === "alle" ? allPuzzles : allPuzzles.filter((p) => p.category === categoryMgmtFilter);
   return (
     <div style={styles.settingsOverlay} onClick={onClose}>
       <div style={styles.settingsCard} onClick={(e) => e.stopPropagation()}>
@@ -992,6 +1051,56 @@ function SettingsModal({
             </div>
           )}
 
+          {settingsTab === "categorieen" && (
+            <div style={styles.settingsSection}>
+              <p style={styles.settingsHint}>Blader door alle puzzels, filter op categorie, en pas aan of verwijder wat je niet (meer) wilt.</p>
+              <select style={styles.settingsInput} value={categoryMgmtFilter} onChange={(e) => setCategoryMgmtFilter(e.target.value)}>
+                {categoriesInDb.map((c) => (
+                  <option key={c} value={c}>{c === "alle" ? "Alle categorieën" : categoryLabel(c)}</option>
+                ))}
+              </select>
+              <div style={styles.puzzleListScroll}>
+                {filteredPuzzles.length === 0 && <p style={styles.settingsHint}>Geen puzzels in deze categorie.</p>}
+                {filteredPuzzles.map((p) => (
+                  <div key={p.id} style={styles.puzzleRow}>
+                    {editingId === p.id ? (
+                      <div style={styles.puzzleEditForm}>
+                        <input style={styles.settingsInput} placeholder="Categorie" value={editDraft.category} onChange={(e) => setEditDraft((d) => ({ ...d, category: e.target.value }))} />
+                        <select style={styles.settingsInput} value={editDraft.age} onChange={(e) => setEditDraft((d) => ({ ...d, age: e.target.value }))}>
+                          {Object.entries(AGE_LABEL).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                        <input style={styles.settingsInput} placeholder="Vraag/hint (optioneel)" value={editDraft.prompt} onChange={(e) => setEditDraft((d) => ({ ...d, prompt: e.target.value }))} />
+                        <input style={styles.settingsInput} placeholder="Antwoord / tekst" value={editDraft.text} onChange={(e) => setEditDraft((d) => ({ ...d, text: e.target.value }))} />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button style={{ ...styles.settingsActionBtn, borderColor: "#2ECC71", color: "#2ECC71" }} onClick={onSaveEdit}>
+                            <Check size={14} style={{ marginRight: 6 }} /> Opslaan
+                          </button>
+                          <button style={styles.settingsActionBtn} onClick={onCancelEdit}>
+                            <X size={14} style={{ marginRight: 6 }} /> Annuleren
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={styles.puzzleRowInfo}>
+                          <span style={styles.puzzleRowBadge}>{categoryLabel(p.category)}</span>
+                          <span style={styles.puzzleRowBadge}>{AGE_LABEL[p.age] || p.age}</span>
+                          <div style={styles.puzzleRowText}>{p.prompt ? `${p.prompt} → ` : ""}{p.text}</div>
+                        </div>
+                        <div style={styles.puzzleRowActions}>
+                          <button style={styles.puzzleIconBtn} onClick={() => onStartEdit(p)} title="Bewerken">✎</button>
+                          <button style={{ ...styles.puzzleIconBtn, color: "#E85D75" }} onClick={() => onDelete(p.id)} title="Verwijderen">✕</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {settingsTab === "toevoegen" && (
             <div style={styles.settingsSection}>
               <p style={styles.settingsHint}>Voeg als kwismaster zelf één puzzel toe — bv. categorie "Film" met antwoord "TITANIC".</p>
@@ -1007,7 +1116,7 @@ function SettingsModal({
                 <Plus size={16} style={{ marginRight: 8 }} /> Toevoegen
               </button>
               {csvFeedback && <p style={styles.settingsFeedback}>{csvFeedback}</p>}
-              <p style={styles.settingsHint}>Eigen puzzels tot nu toe: {customPuzzles.length}. Ze worden bewaard en blijven ook de volgende keer beschikbaar.</p>
+              <p style={styles.settingsHint}>Puzzels in de database: {allPuzzles.length}. Alles wordt bewaard en blijft ook de volgende keer beschikbaar.</p>
             </div>
           )}
 
@@ -1157,6 +1266,16 @@ const styles = {
   doublerToggle: {
     border: "1.5px solid #E67E22", borderRadius: 999, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
   },
+  wrongSplash: {
+    position: "fixed", top: "38%", left: "50%", zIndex: 45,
+    background: "linear-gradient(155deg, #C0392B, #7B241C)",
+    color: "#FFF8ED", border: "3px solid #FFF8ED",
+    borderRadius: 16, padding: "18px 32px",
+    fontFamily: "Georgia, serif", fontWeight: 800, fontSize: "clamp(18px, 3vw, 26px)",
+    boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+    animation: "splashPop 1.2s ease-out forwards",
+    pointerEvents: "none", textAlign: "center", whiteSpace: "nowrap",
+  },
 
   settingsOverlay: { position: "fixed", inset: 0, background: "rgba(6,9,28,0.85)", backdropFilter: "blur(4px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.2s ease-out", padding: 16 },
   settingsCard: { background: "#141B4D", border: "1px solid rgba(242,183,5,0.3)", borderRadius: 18, width: "min(560px, 100%)", maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" },
@@ -1173,4 +1292,13 @@ const styles = {
   settingsActionBtn: { display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1.5px solid #F2B705", color: "#F2B705", borderRadius: 999, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" },
   settingsFeedback: { fontSize: 13, color: "#2ECC71", fontWeight: 700 },
   helpList: { paddingLeft: 20, display: "flex", flexDirection: "column", gap: 10, fontSize: 14, lineHeight: 1.5, color: "#F5F3EA" },
+
+  puzzleListScroll: { maxHeight: "44vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, paddingRight: 4 },
+  puzzleRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "rgba(11,17,48,0.6)", border: "1px solid rgba(139,147,196,0.2)", borderRadius: 10, padding: "10px 12px" },
+  puzzleRowInfo: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 0 },
+  puzzleRowBadge: { fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700, color: "#F2B705", border: "1px solid #F2B705", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" },
+  puzzleRowText: { fontSize: 13, color: "#F5F3EA", wordBreak: "break-word" },
+  puzzleRowActions: { display: "flex", gap: 6, flexShrink: 0 },
+  puzzleIconBtn: { background: "transparent", border: "1px solid rgba(139,147,196,0.4)", borderRadius: 8, width: 30, height: 30, color: "#D8DCF2", cursor: "pointer", fontSize: 14 },
+  puzzleEditForm: { display: "flex", flexDirection: "column", gap: 8, width: "100%" },
 };

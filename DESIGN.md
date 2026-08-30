@@ -49,14 +49,20 @@ Bij spelstart kies je welke niveaus meedoen (chips aan/uit). De categorie
 - **Spelbeheer**: "Ander woord" (huidige puzzel overslaan zonder score-impact)
   en "Spel opnieuw starten" (terug naar startscherm).
 - **Niveaus**: aan/uit per leeftijdscategorie.
+- **Categorieën**: blader door de hele database (ingebouwd + eigen
+  puzzels — het is nu allemaal één en dezelfde, volledig bewerkbare lijst),
+  filter op categorie, bewerk of verwijder losse puzzels inline.
 - **Puzzel toevoegen**: los, als kwismaster — vrije categorie-tekst (Film,
   Muziek, Sport, ...), leeftijdsniveau, optionele hint/vraag, en het
   antwoord. Wordt bewaard via de persistente artifact-storage (blijft ook
   bij een volgende sessie beschikbaar).
 - **Bulk (CSV)**: plak meerdere regels `categorie,leeftijd,tekst,vraag`
-  tegelijk in; wordt geparsed en toegevoegd aan dezelfde opslag als "los
-  toevoegen".
+  tegelijk in; wordt geparsed en toegevoegd aan dezelfde database.
 - **Handleiding**: korte spelregels in het Nederlands, direct in de app.
+
+## Feedback bij een foute letter
+Korte "splash"-melding in beeld (~1,2s, pop/fade-animatie): `"X" staat niet
+op de kaart`, los van de permanente statusregel onder het bord.
 
 ## Status
 - [x] Opzet gedeeld en afgestemd in gesprek
